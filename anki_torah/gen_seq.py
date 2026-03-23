@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from anki_torah.tags import tagify
+
 
 def ref_to_dot(ref_range: str) -> str:
     """
@@ -50,7 +52,8 @@ def build_sequence_notes(parasha_node: dict, get_text_range_fn) -> list[dict]:
         full = build_overlapping_full(verses)
 
         note_id = f"JPS1917|{aliyah_ref}|seq{aliyah_i}"
-        tags = f"Torah::{book}::{parasha} Type::Sequence Aliyah::{aliyah_i}"
+        parasha_tag = f"Torah::{tagify(book)}::{tagify(parasha)}"
+        tags = f"{parasha_tag} Type::Sequence Aliyah::{aliyah_i}"
         title = f"{parasha} — Aliyah {aliyah_i} ({aliyah_ref})"
 
         row = {

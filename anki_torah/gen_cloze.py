@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from anki_torah.tags import tagify
+
 STOPWORDS = {
     "the",
     "and",
@@ -271,7 +273,8 @@ def build_cloze_notes_for_verse(
         clozed = _apply_cloze_offsets(verse_text, [(start_char, end_char)])
 
         note_id = f"JPS1917|{ref}|c{i}"
-        tags = f"Torah::{book}::{parasha} Type::AutoCloze"
+        parasha_tag = f"Torah::{tagify(book)}::{tagify(parasha)}"
+        tags = f"{parasha_tag} Type::AutoCloze"
         notes.append(
             {
                 "NoteID": note_id,
