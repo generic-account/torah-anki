@@ -60,12 +60,21 @@ POS_BONUS = {
 
 @lru_cache(maxsize=1)
 def _get_nlp():
-    import spacy
+    try:
+        import spacy
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "spaCy is required for cloze generation. Install spaCy and then run: "
+            "python -m spacy download en_core_web_sm"
+        ) from exc
 
     try:
         return spacy.load("en_core_web_sm")
     except OSError:
-        return spacy.blank("en")
+        raise RuntimeError(
+            "spaCy model 'en_core_web_sm' is required. Install it with: "
+            "python -m spacy download en_core_web_sm"
+        )
 
 
 def _normalize_token(token) -> str:
@@ -85,11 +94,14 @@ def _is_eligible(token, norm: str) -> bool:
 
 def _tokenize_for_tfidf(text: str) -> list[str]:
     doc = _get_nlp()(text)
-    return [
-        _normalize_token(t)
-        for t in doc
-        if not t.is_space and not t.is_punct and _normalize_token(t)
-    ]
+    terms = []
+    for token in doc:
+        if token.is_space or token.is_punct:
+            continue
+        norm = _normalize_token(token)
+        if norm:
+            terms.append(norm)
+    return terms
 
 
 def _fit_vectorizer(verse_texts: list[str]):
@@ -110,6 +122,12 @@ def _token_score(token, term_to_col: dict[str, int], tfidf_row) -> float | None:
     norm = _normalize_token(token)
     if not _is_eligible(token, norm):
         return None
+    return _base_token_score(token, norm, term_to_col, tfidf_row)
+
+
+def _base_token_score(token, norm: str, term_to_col: dict[str, int], tfidf_row) -> float:
+    if token.is_space or token.is_punct or not norm:
+        return 0.0
 
     tfidf_weight = 0.0
     col = term_to_col.get(norm)
@@ -124,46 +142,78 @@ def _token_score(token, term_to_col: dict[str, int], tfidf_row) -> float | None:
         and token.is_sent_start is False
         else 0.0
     )
-    len_bonus = min(len(token.text), 12) * 0.02
+    len_bonus = min(len(token.text), 12) * 0.008
 
     return tfidf_weight + pos_bonus + cap_bonus + len_bonus
 
+    return tfidf_weight + pos_bonus + cap_bonus + len_bonus
 
 def pick_spans(doc, tfidf_row, term_to_col: dict[str, int], max_spans: int = 2):
-    scores = [_token_score(token, term_to_col, tfidf_row) for token in doc]
+    stop_penalty = -0.05
+    phrase_bonus = {1: 0.0, 2: 0.05, 3: 0.08}
+    phrase_floor = 0.1
 
-    candidates: list[tuple[float, int, int, int]] = []
-    # tuple: (score, span_len, start_idx, end_idx_exclusive)
+    token_data = []
+    for token in doc:
+        norm = _normalize_token(token)
+        is_content = _is_eligible(token, norm)
+        base_score = _base_token_score(token, norm, term_to_col, tfidf_row)
+        if token.is_space or token.is_punct:
+            span_value = stop_penalty
+        elif is_content:
+            span_value = base_score
+        else:
+            span_value = stop_penalty
+
+        token_data.append(
+            {
+                "is_content": is_content,
+                "base_score": base_score,
+                "span_value": span_value,
+            }
+        )
+
+    candidates: list[tuple[float, int, int, int, int]] = []
+    # tuple: (score, span_len, start_idx, end_idx_exclusive, num_content_tokens)
     for span_len in (3, 2, 1):
         for i in range(0, len(doc) - span_len + 1):
-            span_scores = scores[i : i + span_len]
-            if any(v is None for v in span_scores):
+            window = token_data[i : i + span_len]
+            num_content_tokens = sum(1 for entry in window if entry["is_content"])
+            if span_len == 1 and num_content_tokens == 0:
                 continue
-            avg = sum(span_scores) / span_len
-            candidates.append((avg, span_len, i, i + span_len))
+            if span_len > 1 and num_content_tokens == 0:
+                continue
+            avg = sum(entry["span_value"] for entry in window) / span_len
+            score = avg + phrase_bonus[span_len]
+            candidates.append((score, span_len, i, i + span_len, num_content_tokens))
 
     if not candidates:
         return []
 
-    best1 = max((c for c in candidates if c[1] == 1), default=None)
-    best2 = max((c for c in candidates if c[1] == 2), default=None)
-    best3 = max((c for c in candidates if c[1] == 3), default=None)
+    def _rank_key(c):
+        return (-c[0], -c[1], c[2])
 
-    chosen: list[tuple[float, int, int, int]] = []
+    ranked = sorted(candidates, key=_rank_key)
+    singles = [c for c in ranked if c[1] == 1]
+    phrases = [c for c in ranked if c[1] in (2, 3) and c[4] > 0]
 
-    if best1 is not None:
-        if best3 and best3[0] >= 1.0 and best3[0] >= best1[0] - 0.25:
-            chosen.append(best3)
-        elif best2 and best2[0] >= 0.9 and best2[0] >= best1[0] - 0.2:
-            chosen.append(best2)
+    best1 = singles[0] if singles else None
+    best_phrase = phrases[0] if phrases else None
+
+    chosen: list[tuple[float, int, int, int, int]] = []
+    if best1 and best_phrase:
+        close_by_delta = best_phrase[0] >= (best1[0] - 0.10)
+        close_by_ratio = best_phrase[0] >= (best1[0] * 0.92)
+        if best_phrase[0] >= phrase_floor and (close_by_delta or close_by_ratio):
+            chosen.append(best_phrase)
         else:
             chosen.append(best1)
-    elif best3:
-        chosen.append(best3)
-    elif best2:
-        chosen.append(best2)
-
-    ranked = sorted(candidates, key=lambda c: (c[0], c[1], -c[2]), reverse=True)
+    elif best_phrase and best_phrase[0] >= phrase_floor:
+        chosen.append(best_phrase)
+    elif best1:
+        chosen.append(best1)
+    elif best_phrase:
+        chosen.append(best_phrase)
 
     def overlaps(a, b):
         return not (a[3] <= b[2] or b[3] <= a[2])
@@ -173,19 +223,21 @@ def pick_spans(doc, tfidf_row, term_to_col: dict[str, int], max_spans: int = 2):
             break
         if any(overlaps(cand, prev) for prev in chosen):
             continue
-        if cand[1] > 1 and cand[0] < 0.8:
+        if cand[1] > 1 and cand[4] == 0:
             continue
-        if cand[1] == 1 and cand[0] < 0.1:
+        if cand[1] > 1 and cand[0] < phrase_floor:
+            continue
+        if cand[1] == 1 and cand[4] == 0:
             continue
         chosen.append(cand)
 
     if not chosen:
-        fallback = max((c for c in candidates if c[1] == 1), default=None)
+        fallback = singles[0] if singles else None
         if fallback:
             chosen = [fallback]
 
     chosen.sort(key=lambda c: c[2])
-    return [(start, end) for _, _, start, end in chosen[:max_spans]]
+    return [(start, end) for _, _, start, end, _ in chosen[:max_spans]]
 
 
 def _apply_cloze_offsets(text: str, spans: list[tuple[int, int]]) -> str:
