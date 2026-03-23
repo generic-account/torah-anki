@@ -9,6 +9,8 @@ Generate Anki flashcards for memorizing the Torah (English, **JPS 1917**) with m
 ## Requirements
 
 - Python 3
+- spacy
+- scikit-learn
 - Anki Desktop
 - Cloze Overlapper extension
 
@@ -61,3 +63,4 @@ We use stable IDs so re-importing updates notes instead of duplicating them.
 - Numerology
 - Lives of key characters
 - 613 commandments
+

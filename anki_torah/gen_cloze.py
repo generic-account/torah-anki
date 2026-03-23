@@ -146,6 +146,7 @@ def _base_token_score(token, norm: str, term_to_col: dict[str, int], tfidf_row) 
 
     return tfidf_weight + pos_bonus + cap_bonus + len_bonus
 
+    return tfidf_weight + pos_bonus + cap_bonus + len_bonus
 
 def pick_spans(doc, tfidf_row, term_to_col: dict[str, int], max_spans: int = 2):
     stop_penalty = -0.05
