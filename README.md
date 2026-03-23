@@ -1,18 +1,26 @@
 # torah-anki
 
-Generate Anki flashcards for memorizing the Torah (English, **JPS 1917**) with minimal weekly effort.
+Generate Anki flashcards for memorizing the Torah (English, **JPS 1917**)
 
 2 types of automatically generated cards:
-- **Cloze verse cards** (Anki Cloze note type): per-verse deletions (up to 2 per verse)
-- **Sequence / overlap cards** (Anki Cloze (overlapping) note type): one note per aliyah (7 per parashah), with each verse as the next step in the sequence
+- **Cloze verse cards** (Anki Cloze note): per-verse deletions (up to 2 per verse)
+- **Sequence / overlap cards** (Anki Cloze (overlapping) note): one note per aliyah (7 per parashah), with each verse as the next step in the sequence
 
 ## Requirements
 
 - Python 3
-- spacy
-- scikit-learn
+- Python deps:
+  - spacy (and en_core_web_sm)
+  - scikit-learn
 - Anki Desktop
 - Cloze Overlapper extension
+
+
+## Install deps:
+```bash
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+```
 
 ## Run the generator
 
@@ -20,7 +28,7 @@ List available parashah names:
 
 ```bash
 python3 anki_torah.py list
-````
+```
 
 Build one parashah:
 
