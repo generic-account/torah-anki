@@ -102,12 +102,12 @@ def build_cloze_notes_for_verse(
         notes.append(
             {
                 "NoteID": note_id,
-                "Ref": ref,
-                "Parasha": parasha,
                 "Text": clozed,
+                "Extra": f"{ref} | {parasha}",
                 "Tags": tags,
             }
         )
+
     return notes
 
 
