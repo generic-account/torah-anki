@@ -66,7 +66,6 @@ We use stable IDs so re-importing updates notes instead of duplicating them.
 * Cloze notes are generated up to 2 per verse using simple heuristics
 
 ## Future additions (some manual, some not):
-- Better close heuristics
 - Manual summary cards for each parshah
 - Numerology
 - Lives of key characters
