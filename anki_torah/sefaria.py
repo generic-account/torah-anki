@@ -1,8 +1,12 @@
 import requests
+import re
+from typing import List, Tuple
 
 BASE_URL = "https://www.sefaria.org"
 VERSION_TITLE = "The Holy Scriptures: A New Translation (JPS 1917)"
 VERSION_PARAM = f"english|{VERSION_TITLE}"
+
+_REF_RANGE_RE = re.compile(r"^([A-Za-z]+)\s+(\d+):(\d+)-(\d+):(\d+)$")
 
 
 def _flatten(x):
@@ -50,3 +54,58 @@ def get_text_range(tref_range: str) -> list[str]:
     if not segs:
         raise ValueError(f"No text returned for {tref_range}")
     return segs
+
+
+def parse_ref_range(ref_range: str) -> Tuple[str, int, int, int, int]:
+    """
+    'Genesis 1:1-2:3' -> ('Genesis', 1, 1, 2, 3)
+    """
+    m = _REF_RANGE_RE.match(ref_range.strip())
+    if not m:
+        raise ValueError(f"Unsupported ref_range format: {ref_range!r}")
+    book = m.group(1)
+    sc, sv, ec, ev = map(int, m.groups()[1:])
+    return book, sc, sv, ec, ev
+
+
+def get_chapter(book: str, chapter: int) -> List[str]:
+    """
+    Returns list of verses for e.g. Genesis chapter 1.
+    """
+    return get_text_range(f"{book}.{chapter}")
+
+
+def iter_verses(
+    book: str, start_ch: int, start_v: int, end_ch: int, end_v: int
+) -> List[Tuple[str, str]]:
+    """
+    Iterate verses across chapters, inclusive bounds.
+    Returns list of (ref, verse_text) where ref is 'Genesis 1:1' style.
+    """
+    out: List[Tuple[str, str]] = []
+    for ch in range(start_ch, end_ch + 1):
+        verses = get_chapter(book, ch)  # list[str], 1-indexed conceptually
+
+        if ch == start_ch and ch == end_ch:
+            lo, hi = start_v, end_v
+        elif ch == start_ch:
+            lo, hi = start_v, len(verses)
+        elif ch == end_ch:
+            lo, hi = 1, end_v
+        else:
+            lo, hi = 1, len(verses)
+
+        # slice uses 0-index; inclusive hi
+        for vnum in range(lo, hi + 1):
+            text = verses[vnum - 1]
+            ref = f"{book} {ch}:{vnum}"
+            out.append((ref, text))
+    return out
+
+
+def get_verses_for_ref_range(ref_range: str) -> List[Tuple[str, str]]:
+    """
+    Convenience: takes 'Genesis 1:1-2:3' and returns list of (ref,text).
+    """
+    book, sc, sv, ec, ev = parse_ref_range(ref_range)
+    return iter_verses(book, sc, sv, ec, ev)

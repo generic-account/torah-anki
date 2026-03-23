@@ -109,3 +109,26 @@ def build_cloze_notes_for_verse(
             }
         )
     return notes
+
+
+def build_cloze_notes_for_parasha(
+    parasha_node: dict, get_verses_for_ref_range_fn, max_clozes_per_verse: int = 2
+) -> list[dict]:
+    parasha = parasha_node["parasha"]
+    book = parasha_node["book"]
+    whole_ref = parasha_node["wholeRef"]  # e.g. "Genesis 1:1-6:8"
+
+    pairs = get_verses_for_ref_range_fn(whole_ref)  # [(ref, text), ...]
+
+    out = []
+    for ref, verse_text in pairs:
+        out.extend(
+            build_cloze_notes_for_verse(
+                ref=ref,
+                parasha=parasha,
+                book=book,
+                verse_text=verse_text,
+                max_clozes=max_clozes_per_verse,
+            )
+        )
+    return out
