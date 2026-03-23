@@ -6,7 +6,10 @@ BASE_URL = "https://www.sefaria.org"
 VERSION_TITLE = "The Holy Scriptures: A New Translation (JPS 1917)"
 VERSION_PARAM = f"english|{VERSION_TITLE}"
 
-_REF_RANGE_RE = re.compile(r"^([A-Za-z]+)\s+(\d+):(\d+)-(\d+):(\d+)$")
+# Case A: Book 1:1-2:3
+_REF_A = re.compile(r"^([A-Za-z]+)\s+(\d+):(\d+)-(\d+):(\d+)$")
+# Case B: Book 31:1-30   (same chapter)
+_REF_B = re.compile(r"^([A-Za-z]+)\s+(\d+):(\d+)-(\d+)$")
 
 
 def _flatten(x):
@@ -57,15 +60,23 @@ def get_text_range(tref_range: str) -> list[str]:
 
 
 def parse_ref_range(ref_range: str) -> Tuple[str, int, int, int, int]:
-    """
-    'Genesis 1:1-2:3' -> ('Genesis', 1, 1, 2, 3)
-    """
-    m = _REF_RANGE_RE.match(ref_range.strip())
-    if not m:
-        raise ValueError(f"Unsupported ref_range format: {ref_range!r}")
-    book = m.group(1)
-    sc, sv, ec, ev = map(int, m.groups()[1:])
-    return book, sc, sv, ec, ev
+    s = ref_range.strip()
+
+    m = _REF_A.match(s)
+    if m:
+        book = m.group(1)
+        sc, sv, ec, ev = map(int, m.groups()[1:])
+        return book, sc, sv, ec, ev
+
+    m = _REF_B.match(s)
+    if m:
+        book = m.group(1)
+        ch = int(m.group(2))
+        sv = int(m.group(3))
+        ev = int(m.group(4))
+        return book, ch, sv, ch, ev
+
+    raise ValueError(f"Unsupported ref_range format: {ref_range!r}")
 
 
 def get_chapter(book: str, chapter: int) -> List[str]:
