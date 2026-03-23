@@ -1,12 +1,4 @@
 # torah-anki
-Anki flashcards cards for memoring the Torah, and automatic card generation tools
-
-3 types of cards:
-- cloze deletions of verses (prompt verse + deleted phrase)
-- sequence completion cards (prompt verse number and a sentence, answer is next sentence)
-- summary cards of each parshah (main ideas, plus more detailed bulleted point by point summary)
-
-# torah-anki
 
 Generate Anki flashcards for memorizing the Torah (English, **JPS 1917**) with minimal weekly effort.
 
@@ -65,6 +57,7 @@ We use stable IDs so re-importing updates notes instead of duplicating them.
 
 ## Future additions (some manual, some not):
 - Better close heuristics
+- Manual summary cards for each parshah
 - Numerology
 - Lives of key characters
 - 613 commandments
