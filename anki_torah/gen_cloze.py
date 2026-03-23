@@ -125,7 +125,9 @@ def _token_score(token, term_to_col: dict[str, int], tfidf_row) -> float | None:
     return _base_token_score(token, norm, term_to_col, tfidf_row)
 
 
-def _base_token_score(token, norm: str, term_to_col: dict[str, int], tfidf_row) -> float:
+def _base_token_score(
+    token, norm: str, term_to_col: dict[str, int], tfidf_row
+) -> float:
     if token.is_space or token.is_punct or not norm:
         return 0.0
 
@@ -137,9 +139,7 @@ def _base_token_score(token, norm: str, term_to_col: dict[str, int], tfidf_row) 
     pos_bonus = POS_BONUS.get(token.pos_, 0.0)
     cap_bonus = (
         0.7
-        if token.text
-        and token.text[0].isupper()
-        and token.is_sent_start is False
+        if token.text and token.text[0].isupper() and token.is_sent_start is False
         else 0.0
     )
     len_bonus = min(len(token.text), 12) * 0.008
@@ -148,9 +148,10 @@ def _base_token_score(token, norm: str, term_to_col: dict[str, int], tfidf_row) 
 
     return tfidf_weight + pos_bonus + cap_bonus + len_bonus
 
+
 def pick_spans(doc, tfidf_row, term_to_col: dict[str, int], max_spans: int = 2):
-    stop_penalty = -0.05
-    phrase_bonus = {1: 0.0, 2: 0.05, 3: 0.08}
+    stop_penalty = 0.00
+    phrase_bonus = {1: 0.0, 2: 0.15, 3: 0.25}
     phrase_floor = 0.1
 
     token_data = []
@@ -202,8 +203,8 @@ def pick_spans(doc, tfidf_row, term_to_col: dict[str, int], max_spans: int = 2):
 
     chosen: list[tuple[float, int, int, int, int]] = []
     if best1 and best_phrase:
-        close_by_delta = best_phrase[0] >= (best1[0] - 0.10)
-        close_by_ratio = best_phrase[0] >= (best1[0] * 0.92)
+        close_by_delta = best_phrase[0] >= (best1[0] - 0.50)
+        close_by_ratio = best_phrase[0] >= (best1[0] * 0.85)
         if best_phrase[0] >= phrase_floor and (close_by_delta or close_by_ratio):
             chosen.append(best_phrase)
         else:
@@ -243,7 +244,11 @@ def pick_spans(doc, tfidf_row, term_to_col: dict[str, int], max_spans: int = 2):
 def _apply_cloze_offsets(text: str, spans: list[tuple[int, int]]) -> str:
     out = text
     for start_char, end_char in sorted(spans, key=lambda x: x[0], reverse=True):
-        out = out[:start_char] + f"{{{{c1::{out[start_char:end_char]}}}}}" + out[end_char:]
+        out = (
+            out[:start_char]
+            + f"{{{{c1::{out[start_char:end_char]}}}}}"
+            + out[end_char:]
+        )
     return out
 
 
